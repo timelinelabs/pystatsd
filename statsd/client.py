@@ -138,17 +138,23 @@ class StatsClient(StatsClientBase):
         family, _, _, _, addr = socket.getaddrinfo(
             host, port, fam, socket.SOCK_DGRAM)[0]
         self._addr = addr
-        self._sock = socket.socket(family, socket.SOCK_DGRAM)
+        self._fam = fam
+        self._sock = self._create_socket(family, addr)
         self._prefix = prefix
         self._maxudpsize = maxudpsize
+
+    def _create_socket(self, family, addr):
+        sock = socket.socket(family, socket.SOCK_DGRAM)
+        sock.connect(addr)
+        return sock
 
     def _send(self, data):
         """Send data to statsd."""
         try:
-            self._sock.sendto(data.encode('ascii'), self._addr)
+            self._sock.send(data.encode('ascii'))
         except (socket.error, RuntimeError):
-            # No time for love, Dr. Jones!
-            pass
+            self._sock.close()
+            self._sock = self._create_socket(self._fam, self._addr)
 
     def pipeline(self):
         return Pipeline(self)
